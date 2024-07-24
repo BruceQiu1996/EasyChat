@@ -7,8 +7,52 @@
         xmlns:local="clr-namespace:EasyChat"
         xmlns:dialog="clr-namespace:EasyChat.Dialogs"
         xmlns:ui="http://schemas.modernwpf.com/2019"
+        xmlns:helpers ="clr-namespace:EasyChat.Helpers"
         mc:Ignorable="d"
         Title="EasyChat" Height="450" Width="800">
+    <Window.Resources>
+        <helpers:ValueHalfConverter x:Key="ValueHalfConverter"></helpers:ValueHalfConverter>
+        <helpers:MessageDataTemplateSelector x:Key="MessageDataTemplateSelector"></helpers:MessageDataTemplateSelector>
+        <DataTemplate x:Key="mytext">
+            <Grid Name="ctx">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBox Text="{Binding Text,UpdateSourceTrigger=PropertyChanged}"
+                             MaxWidth="{Binding ElementName=ctx,Path=ActualWidth,Converter={StaticResource ValueHalfConverter},UpdateSourceTrigger=PropertyChanged}"
+                             TextWrapping="Wrap"
+                             Background="#555"
+                             AcceptsReturn="True"
+                             VerticalAlignment="Top"
+                             IsReadOnly="True"
+                             VerticalContentAlignment="Top"
+                             BorderThickness="0"
+                             Foreground="White"
+                             HorizontalAlignment="Right"
+                             FontSize="15">
+                    </TextBox>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="hertext">
+            <Grid Name="ctx">
+                <StackPanel Orientation="Vertical" HorizontalAlignment="Left">
+                    <TextBox Text="{Binding Text,UpdateSourceTrigger=PropertyChanged}"
+                             MaxWidth="{Binding ElementName=ctx,Path=ActualWidth,Converter={StaticResource ValueHalfConverter},UpdateSourceTrigger=PropertyChanged}"
+                             TextWrapping="Wrap"
+                             Background="#555"
+                             AcceptsReturn="True"
+                             VerticalAlignment="Top"
+                             IsReadOnly="True"
+                             VerticalContentAlignment="Top"
+                             BorderThickness="0"
+                             Foreground="White"
+                             HorizontalAlignment="Left"
+                             FontSize="15">
+                    </TextBox>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </Window.Resources>
     <behaviors:Interaction.Triggers>
         <behaviors:EventTrigger EventName="Loaded">
             <behaviors:InvokeCommandAction Command="{Binding LoadCommandAsync}"></behaviors:InvokeCommandAction>
@@ -16,36 +60,131 @@
     </behaviors:Interaction.Triggers>
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="125"></ColumnDefinition>
+            <ColumnDefinition Width="185"></ColumnDefinition>
             <ColumnDefinition Width="*"></ColumnDefinition>
         </Grid.ColumnDefinitions>
 
-        <ListBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding Account}"
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50"></RowDefinition>
+            <RowDefinition Height="*"></RowDefinition>
+            <RowDefinition Height="55"></RowDefinition>
+        </Grid.RowDefinitions>
+
+        <ListBox ItemsSource="{Binding Accounts}" 
+                 SelectedItem="{Binding Account}"
+                 BorderThickness="0 0.5 0 0" BorderBrush="#aaa" Background="#eee"
+                 Grid.RowSpan="3"
                  >
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                     <Setter Property="Height" Value="50"></Setter>
                     <Setter Property="Template">
                         <Setter.Value>
-                            <ControlTemplate>
-                                <Border>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <Border Background="{TemplateBinding Background}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="55"></ColumnDefinition>
+                                            <ColumnDefinition Width="*"></ColumnDefinition>
                                             <ColumnDefinition Width="*"></ColumnDefinition>
                                         </Grid.ColumnDefinitions>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="*"></RowDefinition>
                                             <RowDefinition Height="*"></RowDefinition>
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding UserName}" Grid.Row="0"></TextBlock>
+                                        <Border Background="{Binding AvatarColor}"
+                                                Height="45"
+                                                VerticalAlignment="Center"
+                                                Grid.RowSpan="2"
+                                                Width="45"
+                                                CornerRadius="25">
+                                            <TextBlock Text="{Binding AvatarText}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="White"></TextBlock>
+                                        </Border>
+                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" 
+                                                   Margin="5 5 0 0"
+                                                   FontSize="14"
+                                                   Text="{Binding UserName}" Grid.Row="0"></TextBlock>
+                                        <TextBlock Grid.Column="2" VerticalAlignment="Center" 
+                                                   Margin="5 5 0 0"
+                                                   FontSize="12"
+                                                   Foreground="#888"
+                                                   Text="{Binding LastChatTime}" Grid.Row="0"></TextBlock>
+
                                     </Grid>
                                 </Border>
                             </ControlTemplate>
                         </Setter.Value>
                     </Setter>
+
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="#ddd"></Setter>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="False">
+                            <Setter Property="Background" Value="#eee"></Setter>
+                        </Trigger>
+                    </Style.Triggers>
                 </Style>
             </ListBox.ItemContainerStyle>
         </ListBox>
+
+        <TextBlock Text="{Binding Account.UserName}" Grid.Column="1" FontSize="25"
+                   VerticalAlignment="Center" Margin="20 0"
+                   Grid.Row="0"></TextBlock>
+
+        <ScrollViewer helpers:ScrollViewerHelper.AlwaysScrollToEnd="True" 
+                      Grid.Row="1"
+                      Margin="2 0"
+                      Grid.Column="1"
+                      RequestBringIntoView="ScrollViewer_RequestBringIntoView">
+            <behaviors:Interaction.Triggers>
+                <behaviors:EventTrigger EventName="ScrollChanged">
+                    <behaviors:InvokeCommandAction Command="{Binding ChatScrollChangeCommand}" PassEventArgsToCommand="True"></behaviors:InvokeCommandAction>
+                </behaviors:EventTrigger>
+            </behaviors:Interaction.Triggers>
+            <ListBox ItemsSource="{Binding Account.Messages,UpdateSourceTrigger=PropertyChanged}"
+                      VirtualizingPanel.VirtualizationMode="Recycling"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      UseLayoutRounding="True"
+                      BorderBrush="#eee"
+                      BorderThickness="1"
+                      ScrollViewer.CanContentScroll="False"
+                      ScrollViewer.IsDeferredScrollingEnabled="True"
+                      PreviewMouseWheel="ListView_PreviewMouseWheel"
+                      ItemTemplateSelector="{StaticResource MessageDataTemplateSelector}"
+                      TextOptions.TextFormattingMode="Display"
+                      Background="Transparent">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel Orientation="Vertical"></VirtualizingStackPanel>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Margin" Value="0 5"></Setter>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{x:Null}"></Setter>
+                                <Setter Property="BorderThickness" Value="0"></Setter>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="False">
+                                <Setter Property="Background" Value="{x:Null}"></Setter>
+                                <Setter Property="BorderThickness" Value="0"></Setter>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+            </ListBox>
+        </ScrollViewer>
+
+        <StackPanel Orientation="Horizontal" Grid.Row="2" Grid.Column="1" >
+            <TextBox Text="{Binding SendMessage}" Width="350" Margin="2 8 5 8"></TextBox>
+            <Button Content="发送信息" Cursor="Hand"></Button>
+        </StackPanel>
     </Grid>
 </Window>

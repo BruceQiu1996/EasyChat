@@ -6,6 +6,7 @@
         public DateTime SendTime { get; set; }
         public string From { get; set; }
         public string To { get; set; }
+        public bool FromSelf { get; set; }
 
         public virtual string GetDesc() 
         {
