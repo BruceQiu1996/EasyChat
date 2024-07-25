@@ -23,23 +23,10 @@ namespace EasyChat.ViewModels
         {
             UserName = userName;
             SessionId = sessionid;
-            AvatarColor = GetRandBrush(125);
+            AvatarColor = GetRandBrush(0, 130);
             Messages = new ObservableCollection<MessageViewModel>();
             LastChatTime = DateTime.Now.ToString("HH:mm");
-
-            AddMessage(new TextMessageViewModel()
-            {
-                Text = "123213132132132133123今晚吃饭了吗？？？？",
-                FromSelf = true,
-                SendTime = DateTime.Now,
-            });
-
-            AddMessage(new TextMessageViewModel()
-            {
-                Text = "没有吃捏?",
-                FromSelf = false,
-                SendTime = DateTime.Now
-            });
+            Desc = "暂无消息";
         }
 
         private string _lastChatTime;
@@ -47,6 +34,15 @@ namespace EasyChat.ViewModels
         {
             get { return _lastChatTime; }
             set => SetProperty(ref _lastChatTime, value);
+        }
+
+        private DateTime _lastChatDateTime = default;
+
+        private string _desc;
+        public string Desc
+        {
+            get { return _desc; }
+            set => SetProperty(ref _desc, value);
         }
 
         private ObservableCollection<MessageViewModel> messages;
@@ -73,10 +69,24 @@ namespace EasyChat.ViewModels
             return new SolidColorBrush(GetRandColor(start, end));
         }
 
-        private void AddMessage(MessageViewModel message) 
+        public void AddMessage(MessageViewModel message)
         {
+            //第一条消息加上时间
+            if (Messages.Count <= 0)
+            {
+                Messages.Add(new TimeMessageViewModel(null, default, null, null, default, DateTime.Now.ToString("HH:mm")));
+            }
+
+            //隔两分钟的消息加上时间
+            if (_lastChatDateTime != default && DateTime.Now.AddMinutes(-2) >= _lastChatDateTime)
+            {
+                Messages.Add(new TimeMessageViewModel(null, default, null, null, default, DateTime.Now.ToString("HH:mm")));
+            }
+
             Messages.Add(message);
+            _lastChatDateTime = message.SendTime;
             LastChatTime = message.SendTime.ToString("HH:mm");
+            Desc = message.GetDesc();
         }
     }
 }

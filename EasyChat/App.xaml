@@ -6,6 +6,7 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="./Icons.xaml"></ResourceDictionary>
                 <ui:ThemeResources />
                 <ui:XamlControlsResources />
             </ResourceDictionary.MergedDictionaries>

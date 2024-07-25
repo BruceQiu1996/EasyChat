@@ -7,10 +7,11 @@ namespace EasyChat.Dialogs
     /// </summary>
     public partial class ProfileDialog : ContentDialog
     {
+        private readonly ProfileDialogViewModel _profileDialogViewModel;
         public ProfileDialog(ProfileDialogViewModel viewModel)
         {
             InitializeComponent();
-            DataContext = viewModel;
+            DataContext = _profileDialogViewModel = viewModel;
         }
     }
 }

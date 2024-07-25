@@ -4,11 +4,12 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.modernwpf.com/2019"
     Title="设置你的聊天用户名"
-    PrimaryButtonText="Save"
+    PrimaryButtonText="确认"
+    IsPrimaryButtonEnabled="True"
     DefaultButton="Primary">
 
     <StackPanel VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-        <TextBox Text="{Binding UserName}"></TextBox>
+        <TextBox Text="{Binding UserName,UpdateSourceTrigger=PropertyChanged}" Name="userNameTxt"></TextBox>
     </StackPanel>
 
 </ui:ContentDialog>

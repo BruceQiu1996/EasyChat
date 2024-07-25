@@ -5,9 +5,8 @@
         Register = 1, 
         OnlineAccountsList = 2,
         SendTextMessage = 3,
-        SendImageMessage = 4,
-
-        MessageSendAck = 5,
-        MessageReadAck = 6,
+        ReceiveTextMessage = 4,
+        SendImageMessage = 5,
+        ReceiveImageMessage = 6
     }
 }

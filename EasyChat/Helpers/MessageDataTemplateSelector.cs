@@ -13,10 +13,16 @@ namespace EasyChat.Helpers
             DataTemplate dt = null;
             if (obj != null && fe != null)
             {
+                if (obj is TimeMessageViewModel)
+                    dt = fe.FindResource("time") as DataTemplate;
                 if (obj is TextMessageViewModel && obj.FromSelf)
                     dt = fe.FindResource("mytext") as DataTemplate;
                 if (obj is TextMessageViewModel && !obj.FromSelf)
                     dt = fe.FindResource("hertext") as DataTemplate;
+                if (obj is ImageMessageViewModel && obj.FromSelf)
+                    dt = fe.FindResource("myimage") as DataTemplate;
+                if (obj is ImageMessageViewModel && !obj.FromSelf)
+                    dt = fe.FindResource("herimage") as DataTemplate;
             }
 
             return dt;

@@ -20,7 +20,10 @@ namespace EasyChat.Server
             {
                 await HandleMessageAsync(e.Data, e.Session);
             };
-
+            _easyTcpServer.OnClientConnectionChanged += (obj, e) =>
+            {
+                _accounts.TryRemove(e.ClientSession.SessionId, out var account);
+            };
             Console.ReadLine();
         }
 
@@ -50,6 +53,85 @@ namespace EasyChat.Server
                         await UpdateOnlineAccountsToClientAsync();
                     }
                     break;
+                case MessageType.SendTextMessage:
+                    {
+                        var packet = Message<SendTextMessagePacket>.FromBytes(data);
+                        var to = _accounts.FirstOrDefault(x => x.Key == packet.Body.To);
+
+                        if (to.Key != null && to.Value != null)
+                        {
+                            await _easyTcpServer.SendAsync(clientSession, new Message<ReceiveTextMessagePacket>()
+                            {
+                                MessageType = MessageType.ReceiveTextMessage,
+                                Body = new ReceiveTextMessagePacket()
+                                {
+                                    Text = packet.Body.Text,
+                                    From = clientSession.SessionId,
+                                    To = to.Key,
+                                    FromSelf = true,
+                                    MessageId = packet.Body.MessageId
+                                }
+                            }.Serialize());
+
+                            if (to.Key != clientSession.SessionId) //不是自己发自己的
+                            {
+                                await _easyTcpServer.SendAsync(to.Key, new Message<ReceiveTextMessagePacket>()
+                                {
+                                    MessageType = MessageType.ReceiveTextMessage,
+                                    Body = new ReceiveTextMessagePacket()
+                                    {
+                                        Text = packet.Body.Text,
+                                        From = clientSession.SessionId,
+                                        To = to.Key,
+                                        FromSelf = false,
+                                        MessageId = packet.Body.MessageId
+                                    }
+                                }.Serialize());
+                            }
+                        }
+                    }
+                    break;
+
+                case MessageType.SendImageMessage:
+                    {
+                        var packet = Message<SendImageMessagePacket>.FromBytes(data);
+                        var to = _accounts.FirstOrDefault(x => x.Key == packet.Body.To);
+
+                        if (to.Key != null && to.Value != null)
+                        {
+                            await _easyTcpServer.SendAsync(clientSession, new Message<ReceiveImageMessagePacket>()
+                            {
+                                MessageType = MessageType.ReceiveImageMessage,
+                                Body = new ReceiveImageMessagePacket()
+                                {
+                                    FileName = packet.Body.FileName,
+                                    Data = packet.Body.Data,
+                                    From = clientSession.SessionId,
+                                    To = to.Key,
+                                    FromSelf = true,
+                                    MessageId = packet.Body.MessageId
+                                }
+                            }.Serialize());
+
+                            if (to.Key != clientSession.SessionId) //不是自己发自己的
+                            {
+                                await _easyTcpServer.SendAsync(to.Key, new Message<ReceiveImageMessagePacket>()
+                                {
+                                    MessageType = MessageType.ReceiveImageMessage,
+                                    Body = new ReceiveImageMessagePacket()
+                                    {
+                                        Data = packet.Body.Data,
+                                        FileName = packet.Body.FileName,
+                                        From = clientSession.SessionId,
+                                        To = to.Key,
+                                        FromSelf = false,
+                                        MessageId = packet.Body.MessageId
+                                    }
+                                }.Serialize());
+                            }
+                        }
+                    }
+                    break;
             }
         }
 
@@ -73,9 +155,9 @@ namespace EasyChat.Server
                         }
                     }.Serialize());
                 }
-                catch 
+                catch
                 {
-                
+
                 }
             });
         }
