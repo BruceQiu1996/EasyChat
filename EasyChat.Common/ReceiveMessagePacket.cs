@@ -2,7 +2,7 @@
 {
     public class ReceiveMessagePacket : Packet
     {
-        public bool Success { get; set; }
+        public bool Success { get; set; } = true;
         public string Reason { get; set; }
         public bool FromSelf { get; set; }
         public string MessageId { get; set; }

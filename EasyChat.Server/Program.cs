@@ -89,6 +89,23 @@ namespace EasyChat.Server
                                 }.Serialize());
                             }
                         }
+                        else //对方可能下线
+                        {
+                            await _easyTcpServer.SendAsync(clientSession, new Message<ReceiveTextMessagePacket>()
+                            {
+                                MessageType = MessageType.ReceiveTextMessage,
+                                Body = new ReceiveTextMessagePacket()
+                                {
+                                    Success = false,
+                                    Reason = "对方已下线",
+                                    Text = packet.Body.Text,
+                                    From = clientSession.SessionId,
+                                    To = to.Key,
+                                    FromSelf = true,
+                                    MessageId = packet.Body.MessageId
+                                }
+                            }.Serialize());
+                        }
                     }
                     break;
 
@@ -129,6 +146,24 @@ namespace EasyChat.Server
                                     }
                                 }.Serialize());
                             }
+                        }
+                        else //对方可能下线
+                        {
+                            await _easyTcpServer.SendAsync(clientSession, new Message<ReceiveImageMessagePacket>()
+                            {
+                                MessageType = MessageType.ReceiveImageMessage,
+                                Body = new ReceiveImageMessagePacket()
+                                {
+                                    Success = false,
+                                    Reason = "对方已下线",
+                                    FileName = packet.Body.FileName,
+                                    Data = packet.Body.Data,
+                                    From = clientSession.SessionId,
+                                    To = to.Key,
+                                    FromSelf = true,
+                                    MessageId = packet.Body.MessageId
+                                }
+                            }.Serialize());
                         }
                     }
                     break;

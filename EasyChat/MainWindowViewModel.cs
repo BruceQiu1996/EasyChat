@@ -98,27 +98,35 @@ namespace EasyChat
         /// <returns></returns>
         private async Task SendMessageAsync()
         {
+            var tempAccount = Account;
             if (string.IsNullOrEmpty(Message))
                 return;
 
-            if (Account == null)
+            if (tempAccount == null)
                 return;
 
-            await _easyTcpClient.SendAsync(new Message<SendTextMessagePacket>()
+            var message = new Message<SendTextMessagePacket>()
             {
                 MessageType = MessageType.SendTextMessage,
                 Body = new SendTextMessagePacket()
                 {
                     Text = Message,
-                    To = Account.SessionId,
+                    To = tempAccount.SessionId,
                 }
-            }.Serialize());
+            };
+
+            var vm = new TextMessageViewModel(message.Body.MessageId, message.Body.SendTime,
+                null, tempAccount.SessionId, true, Message);
+            vm.IsSending = true; //消息发送中
+            tempAccount.AddMessage(vm);
+            await _easyTcpClient.SendAsync(message.Serialize());
 
             Message = null;
         }
 
         private async Task SendImagesAsync() 
         {
+            var tempAccount = Account;
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
                 Multiselect = true,
@@ -142,7 +150,7 @@ namespace EasyChat
                             MessageType = MessageType.SendImageMessage,
                             Body = new SendImageMessagePacket() 
                             {
-                                To = Account.SessionId,
+                                To = tempAccount.SessionId,
                                 Data = await File.ReadAllBytesAsync(file),
                                 FileName = file
                             }
@@ -178,24 +186,46 @@ namespace EasyChat
                 case MessageType.ReceiveTextMessage:
                     {
                         var packet = Message<ReceiveTextMessagePacket>.FromBytes(data);
-                        if (packet.Body.FromSelf)
+                        if (packet.Body.Success)
                         {
-                            var account = Accounts.FirstOrDefault(x => x.SessionId == packet.Body.To);
-                            if (account != null)
+                            if (packet.Body.FromSelf)
                             {
-                                account.AddMessage(new TextMessageViewModel(packet.Body.MessageId,
-                                    packet.Body.SendTime, packet.Body.From, packet.Body.To, packet.Body.FromSelf,
-                                    packet.Body.Text));
+                                var account = Accounts.FirstOrDefault(x => x.SessionId == packet.Body.To);
+                                if (account != null)
+                                {
+                                    var message = account.Messages.FirstOrDefault(x => x.MessageId == packet.Body.MessageId);
+                                    if (message != null)
+                                    {
+                                        message.IsSending = false;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                var account = Accounts.FirstOrDefault(x => x.SessionId == packet.Body.From);
+                                if (account != null)
+                                {
+                                    account.AddMessage(new TextMessageViewModel(packet.Body.MessageId,
+                                        packet.Body.SendTime, packet.Body.From, packet.Body.To, packet.Body.FromSelf,
+                                        packet.Body.Text));
+                                }
                             }
                         }
                         else 
                         {
-                            var account = Accounts.FirstOrDefault(x => x.SessionId == packet.Body.From);
-                            if (account != null)
+                            if (packet.Body.FromSelf)
                             {
-                                account.AddMessage(new TextMessageViewModel(packet.Body.MessageId,
-                                    packet.Body.SendTime, packet.Body.From, packet.Body.To, packet.Body.FromSelf,
-                                    packet.Body.Text));
+                                var account = Accounts.FirstOrDefault(x => x.SessionId == packet.Body.To);
+                                if (account != null)
+                                {
+                                    var message = account.Messages.FirstOrDefault(x => x.MessageId == packet.Body.MessageId);
+                                    if (message != null)
+                                    {
+                                        message.IsSending = false;
+                                        message.ErrrorMessage = packet.Body.Reason;
+                                        message.IsError = true;
+                                    }
+                                }
                             }
                         }
                     }
