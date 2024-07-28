@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace EasyChat.Common
 {
     [StructLayout(LayoutKind.Sequential)]
-    public class Message<TBody> where TBody : Packet
+    public class Message<TBody> : IMsssage<TBody> where TBody : Packet
     {
         //数据包包体长度 4字节
         public int BodyLength { get; private set; }
@@ -44,5 +44,15 @@ namespace EasyChat.Common
 
             return result;
         }
+
+        public TBody GetBody()
+        {
+            return Body;
+        }
+    }
+
+    public interface IMsssage <out TBody> where TBody : Packet
+    {
+        public TBody GetBody();
     }
 }

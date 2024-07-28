@@ -10,7 +10,7 @@ namespace EasyChat.ViewModels
     public class AccountViewModel : ObservableObject
     {
         public string UserName { get; private set; }
-        public string SessionId { get; private set; }
+        public string SessionId { get; set; }
         private Brush avatarColor;
         public Brush AvatarColor
         {
@@ -69,6 +69,10 @@ namespace EasyChat.ViewModels
             return new SolidColorBrush(GetRandColor(start, end));
         }
 
+        /// <summary>
+        /// 增加消息
+        /// </summary>
+        /// <param name="message"></param>
         public void AddMessage(MessageViewModel message)
         {
             //第一条消息加上时间

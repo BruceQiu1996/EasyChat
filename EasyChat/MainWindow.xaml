@@ -9,17 +9,24 @@
         xmlns:ui="http://schemas.modernwpf.com/2019"
         xmlns:helpers ="clr-namespace:EasyChat.Helpers"
         mc:Ignorable="d"
-        Title="EasyChat" Height="450" Width="800">
+        Title="{Binding Title}" Height="450" Width="800">
     <Window.Resources>
         <helpers:ValueHalfConverter x:Key="ValueHalfConverter"></helpers:ValueHalfConverter>
         <helpers:ValueHalfConverter_2 x:Key="ValueHalfConverter_2"></helpers:ValueHalfConverter_2>
         <helpers:MessageDataTemplateSelector x:Key="MessageDataTemplateSelector"></helpers:MessageDataTemplateSelector>
         <helpers:ObjectToReVisibilityConverter x:Key="ObjectToReVisibilityConverter"></helpers:ObjectToReVisibilityConverter>
         <helpers:ObjectToVisibilityConverter x:Key="ObjectToVisibilityConverter"></helpers:ObjectToVisibilityConverter>
+        <helpers:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"></helpers:BoolToVisibilityConverter>
+        <helpers:BoolToReVisibilityConverter x:Key="BoolToReVisibilityConverter"></helpers:BoolToReVisibilityConverter>
         <DataTemplate x:Key="mytext">
             <Grid Name="ctx" Margin="0 0 15 0">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <ui:ProgressRing Width="20" IsActive="{Binding IsSending}" Margin="0 0 10 0">
+                    <Label Width="15" Height="15" Cursor="Hand" 
+                           Margin=" 0 0 5 0"
+                           Visibility="{Binding IsError,Converter={StaticResource BoolToVisibilityConverter}}" ToolTip="{Binding ErrrorMessage}">
+                        <Path Data="{StaticResource error}"  Stroke="Red" Fill="Red" Stretch="Uniform"></Path>
+                    </Label>
+                    <ui:ProgressRing Width="18" Visibility="{Binding IsSending,Converter={StaticResource BoolToVisibilityConverter}}" IsActive="{Binding IsSending}" Margin="0 0 10 0">
                     </ui:ProgressRing>
                     <TextBox Text="{Binding Text,UpdateSourceTrigger=PropertyChanged}"
                              MaxWidth="{Binding ElementName=ctx,Path=ActualWidth,Converter={StaticResource ValueHalfConverter},UpdateSourceTrigger=PropertyChanged}"
@@ -54,9 +61,6 @@
                              HorizontalAlignment="Left"
                              FontSize="15">
                     </TextBox>
-
-                    <ui:ProgressRing Width="20" IsActive="{Binding IsSending}" Margin="10 0 0 0">
-                    </ui:ProgressRing>
                 </StackPanel>
             </Grid>
         </DataTemplate>
@@ -64,7 +68,10 @@
         <DataTemplate x:Key="myimage">
             <Grid Name="ctx" Margin="0 0 15 0">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <ui:ProgressRing Width="20" IsActive="{Binding IsSending}" Margin="0 0 10 0">
+                    <Label Width="15" Height="15" Margin="0 0 5 0" Cursor="Hand" Visibility="{Binding IsError,Converter={StaticResource BoolToVisibilityConverter}}" ToolTip="{Binding ErrrorMessage}">
+                        <Path Data="{StaticResource error}"  Stroke="Red" Fill="Red" Stretch="Uniform"></Path>
+                    </Label>
+                    <ui:ProgressRing Width="18" Visibility="{Binding IsSending,Converter={StaticResource BoolToVisibilityConverter}}" IsActive="{Binding IsSending}" Margin="0 0 10 0">
                     </ui:ProgressRing>
                     <Border MaxWidth="{Binding ElementName=ctx,Path=ActualWidth,Converter={StaticResource ValueHalfConverter_2},UpdateSourceTrigger=PropertyChanged}">
                         <Image Source="{Binding Source}"
@@ -100,9 +107,6 @@
                             </behaviors:Interaction.Triggers>
                         </Image>
                     </Border>
-
-                    <ui:ProgressRing Width="20" IsActive="{Binding IsSending}" Margin="10 0 0 0">
-                    </ui:ProgressRing>
                 </StackPanel>
             </Grid>
         </DataTemplate>
@@ -279,18 +283,23 @@
                 </ListBox>
             </ScrollViewer>
 
-            <StackPanel Orientation="Horizontal" Grid.Row="2" Grid.Column="1" >
+            <Grid Grid.Row="2" Grid.Column="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"></ColumnDefinition>
+                    <ColumnDefinition Width="80"></ColumnDefinition>
+                    <ColumnDefinition Width="80"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
                 <TextBox Text="{Binding Message,UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap"
-                         Width="420" Margin="2 10 5 10">
+                         Margin="2 10 5 10">
                     <TextBox.InputBindings>
                         <KeyBinding Command="{Binding SendMessageCommandAsync}" Key="Enter"/>
                     </TextBox.InputBindings>
                 </TextBox>
-                <Button Content="发送信息" IsDefault="True" Command="{Binding SendMessageCommandAsync}" Cursor="Hand"></Button>
+                <Button Content="发送信息" Grid.Column="1" IsDefault="True" Command="{Binding SendMessageCommandAsync}" Cursor="Hand"></Button>
 
-                <Button Content="发送图片" Margin="15 0 0 0" Background="Orange" Foreground="White"
+                <Button Content="发送图片" Grid.Column="2" Background="Orange" Foreground="White"
                         Command="{Binding SendImagesCommandAsync}" Cursor="Hand"></Button>
-            </StackPanel>
+            </Grid>
         </Grid>
 
         <Grid Grid.Column="1" Grid.RowSpan="3" 

@@ -10,6 +10,7 @@ namespace EasyChat.Server
         private static readonly ushort _port = 50055;
         private static EasyTcpServer _easyTcpServer;
         private static readonly ConcurrentDictionary<string, Account> _accounts = new ConcurrentDictionary<string, Account>();
+        private static readonly Semaphore _semaphore = new Semaphore(1, 1);
         static void Main(string[] args)
         {
             _easyTcpServer = new EasyTcpServer(_port);
@@ -22,8 +23,12 @@ namespace EasyChat.Server
             };
             _easyTcpServer.OnClientConnectionChanged += (obj, e) =>
             {
-                _accounts.TryRemove(e.ClientSession.SessionId, out var account);
+                if (e.Status == ConnectsionStatus.DisConnected)
+                {
+                    _accounts.TryRemove(e.ClientSession.SessionId, out var account);
+                }
             };
+
             Console.ReadLine();
         }
 
@@ -34,43 +39,83 @@ namespace EasyChat.Server
             {
                 case MessageType.Register:
                     {
-                        var packet = Message<RegisterPacket>.FromBytes(data);
-                        _accounts.AddOrUpdate(clientSession.SessionId, new Account()
+                        try
                         {
-                            UserName = packet.Body.UserName,
-                            Session = clientSession
-                        }, (x, y) =>
-                        {
-                            return new Account()
+                            _semaphore.WaitOne();
+                            var packet = Message<RegisterPacket>.FromBytes(data);
+                            var exist = _accounts.FirstOrDefault(x => x.Value.UserName == packet.Body.UserName).Value;
+                            if (exist != null)
                             {
-                                UserName = packet.Body.UserName,
-                                Session = clientSession
-                            };
-                        });
+                                await _easyTcpServer.SendAsync(clientSession, new Message<RegisterResultPacket>()
+                                {
+                                    MessageType = MessageType.RegisterResult,
+                                    Body = new RegisterResultPacket()
+                                    {
+                                        Success = false,
+                                        Reason = "已有同名用户在线"
+                                    }
+                                }.Serialize());
+                            }
+                            else
+                            {
+                                _accounts.AddOrUpdate(clientSession.SessionId, new Account()
+                                {
+                                    UserName = packet.Body.UserName,
+                                    Session = clientSession
+                                }, (x, y) =>
+                                {
+                                    return new Account()
+                                    {
+                                        UserName = packet.Body.UserName,
+                                        Session = clientSession
+                                    };
+                                });
 
-                        //告知在线的人，更新在线用户列表
-                        //如果需要高并发的情况下1.这里的注册处理需要加信号量或者锁。2.发送用户列表的动作需要在队列中处理，防止后者覆盖前者
-                        await UpdateOnlineAccountsToClientAsync();
+                                await _easyTcpServer.SendAsync(clientSession, new Message<RegisterResultPacket>()
+                                {
+                                    MessageType = MessageType.RegisterResult,
+                                    Body = new RegisterResultPacket()
+                                    {
+                                        Success = true
+                                    }
+                                }.Serialize());
+
+                                //告知在线的人，更新在线用户列表
+                                //如果需要高并发的情况下1.这里的注册处理需要加信号量或者锁。2.发送用户列表的动作需要在队列中处理，防止后者覆盖前者
+                                await UpdateOnlineAccountsToClientAsync();
+                            }
+
+                        }
+                        catch (Exception ex)
+                        {
+                            await _easyTcpServer.SendAsync(clientSession, new Message<RegisterResultPacket>()
+                            {
+                                MessageType = MessageType.RegisterResult,
+                                Body = new RegisterResultPacket()
+                                {
+                                    Success = false,
+                                    Reason = "服务器异常"
+                                }
+                            }.Serialize());
+                        }
+                        finally 
+                        {
+                            _semaphore.Release();
+                        }
                     }
                     break;
                 case MessageType.SendTextMessage:
                     {
+                        await Task.Delay(2000);//测试消息延迟发送后发起者的消息加载状态
                         var packet = Message<SendTextMessagePacket>.FromBytes(data);
-                        var to = _accounts.FirstOrDefault(x => x.Key == packet.Body.To);
-
-                        if (to.Key != null && to.Value != null)
+                        var to = _accounts.FirstOrDefault(x => x.Value.UserName == packet.Body.To);
+                        var from = _accounts.FirstOrDefault(x => x.Value.UserName == packet.Body.From);
+                        if (to.Key != null && from.Key != null)
                         {
                             await _easyTcpServer.SendAsync(clientSession, new Message<ReceiveTextMessagePacket>()
                             {
                                 MessageType = MessageType.ReceiveTextMessage,
-                                Body = new ReceiveTextMessagePacket()
-                                {
-                                    Text = packet.Body.Text,
-                                    From = clientSession.SessionId,
-                                    To = to.Key,
-                                    FromSelf = true,
-                                    MessageId = packet.Body.MessageId
-                                }
+                                Body = new ReceiveTextMessagePacket().FromMessage(packet.Body,true)
                             }.Serialize());
 
                             if (to.Key != clientSession.SessionId) //不是自己发自己的
@@ -78,32 +123,24 @@ namespace EasyChat.Server
                                 await _easyTcpServer.SendAsync(to.Key, new Message<ReceiveTextMessagePacket>()
                                 {
                                     MessageType = MessageType.ReceiveTextMessage,
-                                    Body = new ReceiveTextMessagePacket()
-                                    {
-                                        Text = packet.Body.Text,
-                                        From = clientSession.SessionId,
-                                        To = to.Key,
-                                        FromSelf = false,
-                                        MessageId = packet.Body.MessageId
-                                    }
+                                    Body = new ReceiveTextMessagePacket().FromMessage(packet.Body, false)
                                 }.Serialize());
                             }
                         }
-                        else //对方可能下线
+                        else if (to.Key == null) //对方可能下线
                         {
                             await _easyTcpServer.SendAsync(clientSession, new Message<ReceiveTextMessagePacket>()
                             {
                                 MessageType = MessageType.ReceiveTextMessage,
-                                Body = new ReceiveTextMessagePacket()
-                                {
-                                    Success = false,
-                                    Reason = "对方已下线",
-                                    Text = packet.Body.Text,
-                                    From = clientSession.SessionId,
-                                    To = to.Key,
-                                    FromSelf = true,
-                                    MessageId = packet.Body.MessageId
-                                }
+                                Body = new ReceiveTextMessagePacket().FromMessage(packet.Body, true,false,"对方已下线")
+                            }.Serialize());
+                        }
+                        else 
+                        {
+                            await _easyTcpServer.SendAsync(clientSession, new Message<ReceiveTextMessagePacket>()
+                            {
+                                MessageType = MessageType.ReceiveTextMessage,
+                                Body = new ReceiveTextMessagePacket().FromMessage(packet.Body, true, false, "状态异常,请重新登录")
                             }.Serialize());
                         }
                     }
@@ -113,21 +150,14 @@ namespace EasyChat.Server
                     {
                         var packet = Message<SendImageMessagePacket>.FromBytes(data);
                         var to = _accounts.FirstOrDefault(x => x.Key == packet.Body.To);
+                        var from = _accounts.FirstOrDefault(x => x.Value.UserName == packet.Body.From);
 
-                        if (to.Key != null && to.Value != null)
+                        if (to.Key != null && from.Key != null)
                         {
                             await _easyTcpServer.SendAsync(clientSession, new Message<ReceiveImageMessagePacket>()
                             {
                                 MessageType = MessageType.ReceiveImageMessage,
-                                Body = new ReceiveImageMessagePacket()
-                                {
-                                    FileName = packet.Body.FileName,
-                                    Data = packet.Body.Data,
-                                    From = clientSession.SessionId,
-                                    To = to.Key,
-                                    FromSelf = true,
-                                    MessageId = packet.Body.MessageId
-                                }
+                                Body = new ReceiveImageMessagePacket().FromMessage(packet.Body, true)
                             }.Serialize());
 
                             if (to.Key != clientSession.SessionId) //不是自己发自己的
@@ -135,34 +165,24 @@ namespace EasyChat.Server
                                 await _easyTcpServer.SendAsync(to.Key, new Message<ReceiveImageMessagePacket>()
                                 {
                                     MessageType = MessageType.ReceiveImageMessage,
-                                    Body = new ReceiveImageMessagePacket()
-                                    {
-                                        Data = packet.Body.Data,
-                                        FileName = packet.Body.FileName,
-                                        From = clientSession.SessionId,
-                                        To = to.Key,
-                                        FromSelf = false,
-                                        MessageId = packet.Body.MessageId
-                                    }
+                                    Body = new ReceiveImageMessagePacket().FromMessage(packet.Body, false)
                                 }.Serialize());
                             }
                         }
-                        else //对方可能下线
+                        else if (to.Key == null) //对方可能下线
                         {
                             await _easyTcpServer.SendAsync(clientSession, new Message<ReceiveImageMessagePacket>()
                             {
                                 MessageType = MessageType.ReceiveImageMessage,
-                                Body = new ReceiveImageMessagePacket()
-                                {
-                                    Success = false,
-                                    Reason = "对方已下线",
-                                    FileName = packet.Body.FileName,
-                                    Data = packet.Body.Data,
-                                    From = clientSession.SessionId,
-                                    To = to.Key,
-                                    FromSelf = true,
-                                    MessageId = packet.Body.MessageId
-                                }
+                                Body = new ReceiveImageMessagePacket().FromMessage(packet.Body, true, false, "对方已下线")
+                            }.Serialize());
+                        }
+                        else 
+                        {
+                            await _easyTcpServer.SendAsync(clientSession, new Message<ReceiveImageMessagePacket>()
+                            {
+                                MessageType = MessageType.ReceiveImageMessage,
+                                Body = new ReceiveImageMessagePacket().FromMessage(packet.Body, true, false, "状态异常,请重新登录")
                             }.Serialize());
                         }
                     }

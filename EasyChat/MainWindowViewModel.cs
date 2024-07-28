@@ -36,6 +36,13 @@ namespace EasyChat
             set => SetProperty(ref message, value);
         }
 
+        private string title;
+        public string Title
+        {
+            get { return title; }
+            set => SetProperty(ref title, value);
+        }
+
         public AsyncRelayCommand LoadCommandAsync { get; set; }
         public AsyncRelayCommand SendMessageCommandAsync { get; set; }
         public AsyncRelayCommand SendImagesCommandAsync { get; set; }
@@ -65,6 +72,8 @@ namespace EasyChat
                     await HandleMessageAsync(e.Data);
                 });
             };
+
+            Title = "EasyChat";
         }
 
         private async Task LoadAsync()
@@ -111,12 +120,13 @@ namespace EasyChat
                 Body = new SendTextMessagePacket()
                 {
                     Text = Message,
-                    To = tempAccount.SessionId,
+                    To = tempAccount.UserName,
+                    From = _profileDialogViewModel.UserName
                 }
             };
 
             var vm = new TextMessageViewModel(message.Body.MessageId, message.Body.SendTime,
-                null, tempAccount.SessionId, true, Message);
+                null, tempAccount.UserName, true, Message);
             vm.IsSending = true; //消息发送中
             tempAccount.AddMessage(vm);
             await _easyTcpClient.SendAsync(message.Serialize());
@@ -124,9 +134,12 @@ namespace EasyChat
             Message = null;
         }
 
-        private async Task SendImagesAsync() 
+        private async Task SendImagesAsync()
         {
             var tempAccount = Account;
+            if (tempAccount == null)
+                return;
+
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
                 Multiselect = true,
@@ -145,16 +158,82 @@ namespace EasyChat
                 {
                     foreach (var file in selectedFiles)
                     {
-                        await _easyTcpClient.SendAsync(new Message<SendImageMessagePacket>()
+
+                        var bytes = await File.ReadAllBytesAsync(file);
+                        var message = new Message<SendImageMessagePacket>()
                         {
                             MessageType = MessageType.SendImageMessage,
-                            Body = new SendImageMessagePacket() 
+                            Body = new SendImageMessagePacket()
                             {
-                                To = tempAccount.SessionId,
-                                Data = await File.ReadAllBytesAsync(file),
-                                FileName = file
+                                To = tempAccount.UserName,
+                                From = _profileDialogViewModel.UserName,
+                                Data = bytes,
+                                FileName = Path.GetFileName(file)
                             }
-                        }.Serialize());
+                        };
+
+                        var vm = new ImageMessageViewModel(message.Body.MessageId, message.Body.SendTime, null, tempAccount.UserName, true, bytes, message.Body.FileName);
+                        vm.IsSending = true; //消息发送中
+                        tempAccount.AddMessage(vm);
+                        await _easyTcpClient.SendAsync(message.Serialize());
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 发送消息异常时
+        /// </summary>
+        private void SendMessageError(IMsssage<ReceiveMessagePacket> packet)
+        {
+            if (packet.GetBody().FromSelf)
+            {
+                var account = Accounts.FirstOrDefault(x => x.UserName == packet.GetBody().To);
+                if (account != null)
+                {
+                    var message = account.Messages.FirstOrDefault(x => x.MessageId == packet.GetBody().MessageId);
+                    if (message != null)
+                    {
+                        message.IsSending = false;
+                        message.ErrrorMessage = packet.GetBody().Reason;
+                        message.IsError = true;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 发送消息正常时
+        /// </summary>
+        private void SendMessageNormal(IMsssage<ReceiveMessagePacket> packet)
+        {
+            if (packet.GetBody().FromSelf)
+            {
+                var account = Accounts.FirstOrDefault(x => x.UserName == packet.GetBody().To);
+                if (account != null)
+                {
+                    var message = account.Messages.FirstOrDefault(x => x.MessageId == packet.GetBody().MessageId);
+                    if (message != null)
+                    {
+                        message.IsSending = false;
+                    }
+                }
+            }
+            else
+            {
+                var account = Accounts.FirstOrDefault(x => x.UserName == packet.GetBody().From);
+                if (account != null)
+                {
+                    if (packet.GetBody() is ReceiveTextMessagePacket)
+                    {
+                        var temp = packet.GetBody() as ReceiveTextMessagePacket;
+                        account.AddMessage(new TextMessageViewModel(temp.MessageId, temp.SendTime, temp.From, temp.To, temp.FromSelf, temp.Text));
+                    }
+
+                    if (packet.GetBody() is ReceiveImageMessagePacket)
+                    {
+                        var temp = packet.GetBody() as ReceiveImageMessagePacket;
+                        account.AddMessage(new ImageMessageViewModel(temp.MessageId, temp.SendTime, temp.From, temp.To, temp.FromSelf, temp.Data, temp.FileName));
                     }
                 }
             }
@@ -170,14 +249,33 @@ namespace EasyChat
             var type = (MessageType)BinaryPrimitives.ReadInt32BigEndian(data.Slice(4, 4).Span);
             switch (type)
             {
+                case MessageType.RegisterResult:
+                    {
+                        var packet = Message<RegisterResultPacket>.FromBytes(data);
+                        if (packet.Body.Success)
+                        {
+                            Title = $"EasyChat - {_profileDialogViewModel.UserName}";
+                        }
+                        else
+                        {
+                            MessageBox.Show($"登录注册失败:{packet.Body.Reason}", "异常", MessageBoxButton.OK, MessageBoxImage.Error);
+                            await LoadAsync();
+                        }
+                    }
+                    break;
                 case MessageType.OnlineAccountsList:
                     {
                         var packet = Message<OnlineAccountListPacket>.FromBytes(data);
                         foreach (var item in packet.Body.Accounts)
                         {
-                            if (Accounts.FirstOrDefault(x => x.SessionId == item.Key) == null)
+                            if (Accounts.FirstOrDefault(x => x.UserName == item.Value) == null)
                             {
                                 Accounts.Insert(0, new AccountViewModel(item.Value, item.Key));
+                            }
+                            else 
+                            {
+                                var account = Accounts.FirstOrDefault(x => x.UserName == item.Value);
+                                account.SessionId = item.Key;
                             }
                         }
                     }
@@ -188,45 +286,11 @@ namespace EasyChat
                         var packet = Message<ReceiveTextMessagePacket>.FromBytes(data);
                         if (packet.Body.Success)
                         {
-                            if (packet.Body.FromSelf)
-                            {
-                                var account = Accounts.FirstOrDefault(x => x.SessionId == packet.Body.To);
-                                if (account != null)
-                                {
-                                    var message = account.Messages.FirstOrDefault(x => x.MessageId == packet.Body.MessageId);
-                                    if (message != null)
-                                    {
-                                        message.IsSending = false;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                var account = Accounts.FirstOrDefault(x => x.SessionId == packet.Body.From);
-                                if (account != null)
-                                {
-                                    account.AddMessage(new TextMessageViewModel(packet.Body.MessageId,
-                                        packet.Body.SendTime, packet.Body.From, packet.Body.To, packet.Body.FromSelf,
-                                        packet.Body.Text));
-                                }
-                            }
+                            SendMessageNormal(packet);
                         }
-                        else 
+                        else
                         {
-                            if (packet.Body.FromSelf)
-                            {
-                                var account = Accounts.FirstOrDefault(x => x.SessionId == packet.Body.To);
-                                if (account != null)
-                                {
-                                    var message = account.Messages.FirstOrDefault(x => x.MessageId == packet.Body.MessageId);
-                                    if (message != null)
-                                    {
-                                        message.IsSending = false;
-                                        message.ErrrorMessage = packet.Body.Reason;
-                                        message.IsError = true;
-                                    }
-                                }
-                            }
+                            SendMessageError(packet);
                         }
                     }
                     break;
@@ -234,25 +298,13 @@ namespace EasyChat
                 case MessageType.ReceiveImageMessage:
                     {
                         var packet = Message<ReceiveImageMessagePacket>.FromBytes(data);
-                        if (packet.Body.FromSelf)
+                        if (packet.Body.Success)
                         {
-                            var account = Accounts.FirstOrDefault(x => x.SessionId == packet.Body.To);
-                            if (account != null)
-                            {
-                                account.AddMessage(new ImageMessageViewModel(packet.Body.MessageId,
-                                    packet.Body.SendTime, packet.Body.From, packet.Body.To, packet.Body.FromSelf,
-                                    packet.Body.Data,packet.Body.FileName));
-                            }
+                            SendMessageNormal(packet);
                         }
                         else
                         {
-                            var account = Accounts.FirstOrDefault(x => x.SessionId == packet.Body.From);
-                            if (account != null)
-                            {
-                                account.AddMessage(new ImageMessageViewModel(packet.Body.MessageId,
-                                    packet.Body.SendTime, packet.Body.From, packet.Body.To, packet.Body.FromSelf,
-                                    packet.Body.Data, packet.Body.FileName));
-                            }
+                            SendMessageError(packet);
                         }
                     }
                     break;
