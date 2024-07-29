@@ -106,7 +106,7 @@ namespace EasyChat.Server
                     break;
                 case MessageType.SendTextMessage:
                     {
-                        await Task.Delay(2000);//测试消息延迟发送后发起者的消息加载状态
+                        //await Task.Delay(2000);//测试消息延迟发送后发起者的消息加载状态
                         var packet = Message<SendTextMessagePacket>.FromBytes(data);
                         var to = _accounts.FirstOrDefault(x => x.Value.UserName == packet.Body.To);
                         var from = _accounts.FirstOrDefault(x => x.Value.UserName == packet.Body.From);
@@ -149,7 +149,7 @@ namespace EasyChat.Server
                 case MessageType.SendImageMessage:
                     {
                         var packet = Message<SendImageMessagePacket>.FromBytes(data);
-                        var to = _accounts.FirstOrDefault(x => x.Key == packet.Body.To);
+                        var to = _accounts.FirstOrDefault(x => x.Value.UserName == packet.Body.To);
                         var from = _accounts.FirstOrDefault(x => x.Value.UserName == packet.Body.From);
 
                         if (to.Key != null && from.Key != null)

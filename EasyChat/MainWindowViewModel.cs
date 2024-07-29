@@ -26,7 +26,12 @@ namespace EasyChat
         public AccountViewModel Account
         {
             get { return account; }
-            set => SetProperty(ref account, value);
+            set
+            {
+                SetProperty(ref account, value);
+                account.UnReadCounts = 0;
+                account.UnReadCountText = null;
+            }
         }
 
         private string message;
@@ -34,6 +39,13 @@ namespace EasyChat
         {
             get { return message; }
             set => SetProperty(ref message, value);
+        }
+
+        private string status;
+        public string Status
+        {
+            get { return status; }
+            set => SetProperty(ref status, value);
         }
 
         private string title;
@@ -50,8 +62,10 @@ namespace EasyChat
         private readonly EasyTcpClient _easyTcpClient;
         private readonly ProfileDialog _profileDialog;
         private readonly ProfileDialogViewModel _profileDialogViewModel;
+        private readonly string _disConnectTip = "[与服务器断开连接，正在重连中...]";
         public MainWindowViewModel(ProfileDialog profileDialog, ProfileDialogViewModel profileDialogViewModel)
         {
+            Title = "EasyChat";
             _profileDialog = profileDialog;
             _profileDialogViewModel = profileDialogViewModel;
             LoadCommandAsync = new AsyncRelayCommand(LoadAsync);
@@ -72,8 +86,11 @@ namespace EasyChat
                     await HandleMessageAsync(e.Data);
                 });
             };
-
-            Title = "EasyChat";
+            _easyTcpClient.OnDisConnected += async (obj, e) =>
+            {
+                Title = Title + _disConnectTip;
+                await ReConnectAsync();
+            };
         }
 
         private async Task LoadAsync()
@@ -95,9 +112,40 @@ namespace EasyChat
                     }.Serialize());
                 }
             }
-            catch (Exception ex)
+            catch
             {
                 //初始化失败
+
+            }
+        }
+
+        /// <summary>
+        /// 重连，重新注册
+        /// </summary>
+        /// <returns></returns>
+        private async Task ReConnectAsync() 
+        {
+            while (true) 
+            {
+                try
+                {
+                    await _easyTcpClient.ConnectAsync();
+                    await _easyTcpClient.SendAsync(new Message<RegisterPacket>()
+                    {
+                        MessageType = MessageType.Register,
+                        Body = new RegisterPacket()
+                        {
+                            UserName = _profileDialogViewModel.UserName
+                        }
+                    }.Serialize());
+                    Title = Title.Replace(_disConnectTip, string.Empty);
+                    break;
+                }
+                catch
+                {
+                    await Task.Delay(1500);
+                    continue;
+                }
             }
         }
 
@@ -125,11 +173,20 @@ namespace EasyChat
                 }
             };
 
-            var vm = new TextMessageViewModel(message.Body.MessageId, message.Body.SendTime,
-                null, tempAccount.UserName, true, Message);
+            var vm = new TextMessageViewModel(message.Body.MessageId, message.Body.SendTime,null, tempAccount.UserName, true, Message);
             vm.IsSending = true; //消息发送中
-            tempAccount.AddMessage(vm);
-            await _easyTcpClient.SendAsync(message.Serialize());
+
+            tempAccount.AddMessage(vm, true);
+            try
+            {
+                await _easyTcpClient.SendAsync(message.Serialize());
+            }
+            catch
+            {
+                vm.IsSending = false;
+                vm.ErrrorMessage = "与服务器连接异常";
+                vm.IsError = true;
+            }
 
             Message = null;
         }
@@ -174,8 +231,17 @@ namespace EasyChat
 
                         var vm = new ImageMessageViewModel(message.Body.MessageId, message.Body.SendTime, null, tempAccount.UserName, true, bytes, message.Body.FileName);
                         vm.IsSending = true; //消息发送中
-                        tempAccount.AddMessage(vm);
-                        await _easyTcpClient.SendAsync(message.Serialize());
+                        tempAccount.AddMessage(vm,true);
+                        try
+                        {
+                            await _easyTcpClient.SendAsync(message.Serialize());
+                        }
+                        catch 
+                        {
+                            vm.IsSending = false;
+                            vm.ErrrorMessage = "与服务器连接异常";
+                            vm.IsError = true;
+                        }
                     }
                 }
             }
@@ -227,13 +293,15 @@ namespace EasyChat
                     if (packet.GetBody() is ReceiveTextMessagePacket)
                     {
                         var temp = packet.GetBody() as ReceiveTextMessagePacket;
-                        account.AddMessage(new TextMessageViewModel(temp.MessageId, temp.SendTime, temp.From, temp.To, temp.FromSelf, temp.Text));
+                        account.AddMessage(new TextMessageViewModel(temp.MessageId, temp.SendTime, temp.From, temp.To, temp.FromSelf, temp.Text),
+                            account == Account);
                     }
 
                     if (packet.GetBody() is ReceiveImageMessagePacket)
                     {
                         var temp = packet.GetBody() as ReceiveImageMessagePacket;
-                        account.AddMessage(new ImageMessageViewModel(temp.MessageId, temp.SendTime, temp.From, temp.To, temp.FromSelf, temp.Data, temp.FileName));
+                        account.AddMessage(new ImageMessageViewModel(temp.MessageId, temp.SendTime, temp.From, temp.To, temp.FromSelf, temp.Data, temp.FileName),
+                            account == Account);
                     }
                 }
             }

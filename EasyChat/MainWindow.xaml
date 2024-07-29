@@ -26,7 +26,7 @@
                            Visibility="{Binding IsError,Converter={StaticResource BoolToVisibilityConverter}}" ToolTip="{Binding ErrrorMessage}">
                         <Path Data="{StaticResource error}"  Stroke="Red" Fill="Red" Stretch="Uniform"></Path>
                     </Label>
-                    <ui:ProgressRing Width="18" Visibility="{Binding IsSending,Converter={StaticResource BoolToVisibilityConverter}}" IsActive="{Binding IsSending}" Margin="0 0 10 0">
+                    <ui:ProgressRing Width="15" Visibility="{Binding IsSending,Converter={StaticResource BoolToVisibilityConverter}}" IsActive="{Binding IsSending}" Margin="0 0 10 0">
                     </ui:ProgressRing>
                     <TextBox Text="{Binding Text,UpdateSourceTrigger=PropertyChanged}"
                              MaxWidth="{Binding ElementName=ctx,Path=ActualWidth,Converter={StaticResource ValueHalfConverter},UpdateSourceTrigger=PropertyChanged}"
@@ -71,7 +71,7 @@
                     <Label Width="15" Height="15" Margin="0 0 5 0" Cursor="Hand" Visibility="{Binding IsError,Converter={StaticResource BoolToVisibilityConverter}}" ToolTip="{Binding ErrrorMessage}">
                         <Path Data="{StaticResource error}"  Stroke="Red" Fill="Red" Stretch="Uniform"></Path>
                     </Label>
-                    <ui:ProgressRing Width="18" Visibility="{Binding IsSending,Converter={StaticResource BoolToVisibilityConverter}}" IsActive="{Binding IsSending}" Margin="0 0 10 0">
+                    <ui:ProgressRing Width="15" Visibility="{Binding IsSending,Converter={StaticResource BoolToVisibilityConverter}}" IsActive="{Binding IsSending}" Margin="0 0 10 0">
                     </ui:ProgressRing>
                     <Border MaxWidth="{Binding ElementName=ctx,Path=ActualWidth,Converter={StaticResource ValueHalfConverter_2},UpdateSourceTrigger=PropertyChanged}">
                         <Image Source="{Binding Source}"
@@ -81,7 +81,7 @@
                                HorizontalAlignment="Right">
                             <behaviors:Interaction.Triggers>
                                 <behaviors:EventTrigger EventName="MouseLeftButtonDown">
-                                    <behaviors:InvokeCommandAction Command="{Binding LeftButtonClickCommandAsync}"
+                                    <behaviors:InvokeCommandAction Command="{Binding OpenImageClickCommandAsync}"
                                                     ></behaviors:InvokeCommandAction>
                                 </behaviors:EventTrigger>
                             </behaviors:Interaction.Triggers>
@@ -101,7 +101,7 @@
                                HorizontalAlignment="Left">
                             <behaviors:Interaction.Triggers>
                                 <behaviors:EventTrigger EventName="MouseLeftButtonDown">
-                                    <behaviors:InvokeCommandAction Command="{Binding LeftButtonClickCommandAsync}"
+                                    <behaviors:InvokeCommandAction Command="{Binding OpenImageClickCommandAsync}"
                                                            ></behaviors:InvokeCommandAction>
                                 </behaviors:EventTrigger>
                             </behaviors:Interaction.Triggers>
@@ -154,11 +154,13 @@
             <ColumnDefinition Width="185"></ColumnDefinition>
             <ColumnDefinition Width="*"></ColumnDefinition>
         </Grid.ColumnDefinitions>
-
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"></RowDefinition>
+        </Grid.RowDefinitions>
         <ListBox ItemsSource="{Binding Accounts}" 
                  SelectedItem="{Binding Account}"
                  BorderThickness="0 0.5 0 0" BorderBrush="#aaa" Background="#eee"
-                 Grid.RowSpan="3"
+                 Grid.RowSpan="2"
                  >
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
@@ -187,6 +189,14 @@
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"
                                                        Foreground="White"></TextBlock>
+                                        </Border>
+                                        <Border Width="18" Height="18" Margin="30 0 0 0" Background="Red" CornerRadius="9"
+                                                Visibility="{Binding UnReadCountText,UpdateSourceTrigger=PropertyChanged,Converter={StaticResource ObjectToVisibilityConverter}}">
+                                            <TextBlock Foreground="White" 
+                                                       HorizontalAlignment="Center"
+                                                       FontSize="11" VerticalAlignment="Center"
+                                                       Text="{Binding UnReadCountText,UpdateSourceTrigger=PropertyChanged}"
+                                                       ></TextBlock>
                                         </Border>
                                         <TextBlock Grid.Column="1" VerticalAlignment="Center" 
                                                    Margin="5 5 0 0"
@@ -224,7 +234,7 @@
             </ListBox.ItemContainerStyle>
         </ListBox>
 
-        <Grid Grid.Column="1" Grid.RowSpan="3" Visibility="{Binding Account,Converter={StaticResource ObjectToVisibilityConverter}}">
+        <Grid Grid.Column="1" Grid.Row="0" Visibility="{Binding Account,Converter={StaticResource ObjectToVisibilityConverter}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="50"></RowDefinition>
                 <RowDefinition Height="*"></RowDefinition>
@@ -302,7 +312,7 @@
             </Grid>
         </Grid>
 
-        <Grid Grid.Column="1" Grid.RowSpan="3" 
+        <Grid Grid.Column="1" Grid.Row="0"
               Visibility="{Binding Account,Converter={StaticResource ObjectToReVisibilityConverter}}">
             <Path Data="{StaticResource message}" Stroke="Azure" Fill="#ccc"
                   Height="60"

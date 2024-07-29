@@ -36,6 +36,21 @@ namespace EasyChat.ViewModels
             set => SetProperty(ref _lastChatTime, value);
         }
 
+        private int _unReadCounts;
+        public int UnReadCounts
+        {
+            get { return _unReadCounts; }
+            set => SetProperty(ref _unReadCounts, value);
+        }
+
+        private string? _unReadCountText;
+        public string? UnReadCountText
+        {
+            get { return _unReadCountText; }
+            set => SetProperty(ref _unReadCountText, value);
+        }
+
+
         private DateTime _lastChatDateTime = default;
 
         private string _desc;
@@ -73,7 +88,7 @@ namespace EasyChat.ViewModels
         /// 增加消息
         /// </summary>
         /// <param name="message"></param>
-        public void AddMessage(MessageViewModel message)
+        public void AddMessage(MessageViewModel message, bool isCurrent)
         {
             //第一条消息加上时间
             if (Messages.Count <= 0)
@@ -91,6 +106,12 @@ namespace EasyChat.ViewModels
             _lastChatDateTime = message.SendTime;
             LastChatTime = message.SendTime.ToString("HH:mm");
             Desc = message.GetDesc();
+            if (!isCurrent)
+            {
+                UnReadCounts++;
+            }
+
+            UnReadCountText = UnReadCounts == 0 ? null : UnReadCounts > 99 ? "99+" : UnReadCounts.ToString();
         }
     }
 }
