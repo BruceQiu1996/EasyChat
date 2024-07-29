@@ -18,6 +18,11 @@ namespace EasyChat.ViewModels
             OpenImageClickCommandAsync = new AsyncRelayCommand(OpenImageClickAsync);
         }
 
+        public override string GetDesc()
+        {
+            return "[图片信息]";
+        }
+
         public void BytesToSource(byte[] data)
         {
             var source = new BitmapImage();
